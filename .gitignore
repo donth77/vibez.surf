@@ -1,0 +1,10 @@
+node_modules
+dist
+.DS_Store
+*.log
+.vite
+.claude
+# Use pnpm — lock file is pnpm-lock.yaml; ignore npm's lock to avoid conflicts.
+package-lock.json
+# TypeScript incremental build cache.
+tsconfig.tsbuildinfo

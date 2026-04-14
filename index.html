@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="description" content="Vibez.surf — pick an audio file and ride a track generated from its waveform." />
+    <title>Vibez.surf</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        /* iOS safe-area insets (notches, home indicator). Widgets read these
+           via env() — keeps the HUD + file picker clear of rounded corners. */
+        --safe-top:    env(safe-area-inset-top, 0px);
+        --safe-right:  env(safe-area-inset-right, 0px);
+        --safe-bottom: env(safe-area-inset-bottom, 0px);
+        --safe-left:   env(safe-area-inset-left, 0px);
+      }
+      html, body { margin: 0; padding: 0; height: 100%; background: #000; overflow: hidden;
+        /* Prevent pull-to-refresh and rubber-banding on touch devices so swipes
+           don't scroll the page instead of steering the ship. */
+        overscroll-behavior: none;
+        touch-action: none;
+        -webkit-user-select: none; user-select: none;
+      }
+      body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; color: #fff; }
+      #app { position: fixed; inset: 0; }
+      canvas { display: block; width: 100%; height: 100%; }
+      /* Visible keyboard focus across the whole UI. Mouse clicks don't trigger
+         :focus-visible, so sighted pointer users never see the ring. */
+      :focus { outline: none; }
+      :focus-visible {
+        outline: 2px solid #6cf;
+        outline-offset: 2px;
+        border-radius: 4px;
+      }
+      /* sr-only: keeps a control in the keyboard tab order and accessibility
+         tree while hiding it visually. Used for the file input. */
+      .sr-only {
+        position: absolute !important;
+        width: 1px; height: 1px;
+        padding: 0; margin: -1px;
+        overflow: hidden; clip: rect(0,0,0,0);
+        white-space: nowrap; border: 0;
+      }
+      @media (prefers-reduced-motion: reduce) {
+        *, *::before, *::after {
+          animation-duration: 0.001ms !important;
+          animation-iteration-count: 1 !important;
+          transition-duration: 0.001ms !important;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
