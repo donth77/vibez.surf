@@ -8,6 +8,7 @@ import { mountFileBrowser, type FileBrowser } from './ui/fileBrowser';
 import { type LoadedAudio } from './audio/audioLoader';
 import { loadAudioFromUrl } from './audio/urlLoader';
 import { generateFromPrompt, waitForSong, parseSunoUrl, fetchSongById, isSunoEnabled } from './suno/sunoClient';
+import { resolveSunoShareLink } from './suno/shareResolver';
 import { mountSunoSettingsModal, type SunoSettingsModal } from './ui/sunoSettings';
 import { getNameFromPath } from './util/files';
 import { FftWorkerPool } from './audio/workerPool';
@@ -526,29 +527,10 @@ fileBrowser = mountFileBrowser({
     // Worker (workers/suno-share-resolver), we call it to get {uuid, title,
     // audioUrl}; otherwise we instruct them how to proceed manually.
     if (/^https?:\/\/(?:www\.)?suno\.com\/s\//i.test(url.trim())) {
-      // Resolver is baked in at build time via VITE_SUNO_RESOLVER — set it
-      // in your Vercel/host env vars so every visitor uses your Worker.
-      const sunoResolverUrl = (import.meta.env.VITE_SUNO_RESOLVER as string | undefined) || '';
-      if (!sunoResolverUrl) {
-        throw new Error(
-          'Suno share links (/s/<code>) need the share-resolver Worker ' +
-          'configured at build time (VITE_SUNO_RESOLVER). Or open the link ' +
-          'in a new tab, wait for it to redirect, copy the resulting ' +
-          '/song/<uuid> URL, and paste that here.',
-        );
-      }
       loadingOverlay.setMessage('Resolving Suno share link');
-      const base = sunoResolverUrl.replace(/\/+$/, '');
-      const resolverResp = await fetch(`${base}/?url=${encodeURIComponent(url.trim())}`);
-      if (!resolverResp.ok) {
-        throw new Error(`Suno share resolver returned HTTP ${resolverResp.status}`);
-      }
-      const body = await resolverResp.json() as { uuid?: string; title?: string; audioUrl?: string };
-      if (!body.audioUrl) {
-        throw new Error('Suno share resolver returned no audioUrl');
-      }
-      effectiveUrl = body.audioUrl;
-      suggestedTitle = body.title ?? null;
+      const resolved = await resolveSunoShareLink(url.trim());
+      effectiveUrl = resolved.audioUrl;
+      suggestedTitle = resolved.title;
     }
 
     // Suno song-page URLs (https://suno.com/song/<uuid>) are HTML. We resolve
@@ -671,9 +653,18 @@ fileBrowser = mountFileBrowser({
       return;
     }
     if (song.sourceUrl) {
+      // Replaying a Suno share link — can't fetch the bare `/s/<code>` URL
+      // from the browser (307 redirect, no CORS). Re-resolve via the
+      // Worker to get a direct CDN URL, same as the initial-play path does.
+      let effectiveUrl = song.sourceUrl;
+      if (song.kind === 'suno-share' && /^https?:\/\/(?:www\.)?suno\.com\/s\//i.test(song.sourceUrl)) {
+        loadingOverlay.setMessage('Resolving Suno share link');
+        const resolved = await resolveSunoShareLink(song.sourceUrl);
+        effectiveUrl = resolved.audioUrl;
+      }
       loadingOverlay.setMessage('Fetching audio');
       loadingOverlay.setProgress(0);
-      const loaded = await loadAudioFromUrl(song.sourceUrl, (f) => loadingOverlay?.setProgress(f));
+      const loaded = await loadAudioFromUrl(effectiveUrl, (f) => loadingOverlay?.setProgress(f));
       await startGame(loaded, song.title, {
         kind: song.kind,
         sourceUrl: song.sourceUrl,
@@ -736,7 +727,7 @@ function tick() {
       const currentP = Math.min(0.9999, Math.max(0, currentAudio.element.currentTime / dur));
       // Use the player's track data (same instance) to read the current color.
       player.getCurrentColor(_currentColor);
-      blocks.update(currentP, _currentColor, t);
+      blocks.update(currentP, _currentColor, t, player.getCurrentSpeedFactor());
       if (hexagons) hexagons.update(currentP, _currentColor, dt);
       if (fireworks) fireworks.update(dt);
       if (rays) rays.update(dt);
@@ -750,6 +741,10 @@ function tick() {
             hud.setScore(points.currentPoints, points.totalTrackPoints, points.percentage);
             hud.spawnFloatingLabel(`+${points.lastPickLabelValue}`, lastLabelSide, false);
             lastLabelSide = lastLabelSide === 'left' ? 'right' : 'left';
+            // Brief rocket-fire pulse — visible feedback that plays in a
+            // spot the camera always sees (behind the ship). Subtle
+            // enough not to distract, unlike a full-body emissive flash.
+            player?.triggerPickBoost();
 
             // Fireworks burst at the matching screen-space anchor (top-left /
             // top-center / top-right). Color = current track color.

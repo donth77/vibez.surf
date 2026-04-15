@@ -80,6 +80,18 @@ export class PlayerController {
   /** Two rocket-fire emitters (left + right thruster). */
   private readonly rocketFires: RocketFire[] = [];
 
+  // Rocket-pulse state for pickup feedback. The block's own animation
+  // plays behind the ship at speed and can be missed, but the thrusters
+  // are always in view — briefly boosting their length on each pickup
+  // gives every pick a visible "charge" without the distraction of a
+  // ship-body emissive flash.
+  private pickBoostTimer = 0;                    // seconds remaining
+  private readonly pickBoostDuration = 0.25;     // total decay window
+  // Multiplicative so the pulse feels proportional at every song volume:
+  // at peak, flame intensity is scaled by (1 + this value) before the
+  // normal intensity→length mapping. 0.3 = "+30% flame at peak".
+  private readonly pickBoostMagnitude = 0.3;
+
   // Pre-roll state — ship cruises along the runway (behind the spline origin)
   // at constant speed before audio starts. During pre-roll the normal audio-
   // driven position / orientation code is bypassed.
@@ -266,6 +278,24 @@ export class PlayerController {
     return this.trackData.spline.getColorAt(t, out);
   }
 
+  /** 0..1 ship speed factor derived from the current hue (same math the
+   *  camera + rocket fire use). Exposed so other systems (e.g. the block
+   *  pickup animation) can scale with speed. */
+  /** Briefly boost the rocket-fire length — called from the onPick handler
+   *  each time a block is collected so every pick has visible feedback. */
+  triggerPickBoost(): void {
+    this.pickBoostTimer = this.pickBoostDuration;
+  }
+
+  getCurrentSpeedFactor(): number {
+    const dur = this.audio.duration;
+    if (!isFinite(dur) || dur <= 0) return 0;
+    const t = Math.min(0.9999, Math.max(0, this.audio.currentTime / dur));
+    this.trackData.spline.getColorAt(t, this._color);
+    this._color.getHSL(this._hsl);
+    return clamp01((0.83 - this._hsl.h) / 0.83);
+  }
+
   /**
    * Start a pre-roll cruise. Ship is placed `distance` units BEHIND the
    * spline origin (along -tangent), then linearly translated toward the
@@ -433,13 +463,18 @@ export class PlayerController {
     this.updateSpaceshipAnimation(dt);
 
     // Rocket fire. Use the spline's sub-spline index for `u` so the
-    // intensity lookup matches the chunk-index convention.
+    // intensity lookup matches the chunk-index convention. Pickup boost
+    // is added on top (decays linearly over `pickBoostDuration`) so every
+    // collected block produces a visible thruster flare.
     const intensities = this.trackData.normalizedIntensities;
     const subIdx = spline.getSubSplineIndexes(currentP);
     const u = Math.min(intensities.length - 2, subIdx.firstSubSplinePointIndex);
     const intensity = intensities[u]!;
+    if (this.pickBoostTimer > 0) this.pickBoostTimer = Math.max(0, this.pickBoostTimer - dt);
+    const boostFraction = this.pickBoostTimer / this.pickBoostDuration;
+    const rocketIntensity = Math.min(1, intensity * (1 + boostFraction * this.pickBoostMagnitude));
     for (const rf of this.rocketFires) {
-      rf.update(performance.now() / 1000, intensity, this._color, ROCKET_MIN_SPEED, ROCKET_MAX_SPEED);
+      rf.update(performance.now() / 1000, rocketIntensity, this._color, ROCKET_MIN_SPEED, ROCKET_MAX_SPEED);
     }
     // currentSpeed = invLerp(0.83, 0, hue). hue 0.83 → speed 0; hue 0 → speed 1.
     const currentSpeed = clamp01((0.83 - this._hsl.h) / 0.83);

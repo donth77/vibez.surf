@@ -259,9 +259,14 @@ async function throwFriendlyError(res: Response, op: string): Promise<never> {
   if (res.status === 429) {
     throw new Error('Rate-limited by Suno — wait a minute and try again.');
   }
+  // 5xx bodies can contain proxy-internal detail (stack traces, headers,
+  // upstream error payloads) that we shouldn't surface to users. Only echo
+  // the body for 4xx, which is assumed to be a user-actionable message.
+  const bodySuffix = rawBody && res.status >= 400 && res.status < 500
+    ? ` — ${rawBody.slice(0, 200)}`
+    : '';
   throw new Error(
-    `Suno /${op} failed: HTTP ${res.status} ${res.statusText}` +
-    (rawBody ? ` — ${rawBody.slice(0, 200)}` : ''),
+    `Suno /${op} failed: HTTP ${res.status} ${res.statusText}${bodySuffix}`,
   );
 }
 

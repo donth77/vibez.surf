@@ -1,0 +1,52 @@
+# vibez.surf
+
+> A free, browser-based music visualizer and rhythm game. Users pick any audio file (MP3, WAV, FLAC, OGG, AAC), paste a Suno AI share link, or generate a track via Suno; the site analyzes the waveform and builds a 3D ribbon track they ride to the beat, collecting glowing blocks placed on musical-energy peaks.
+
+vibez.surf runs entirely in the browser — no install, no accounts for the core experience. It is inspired by the 2008 Windows game "Audiosurf" by Dylan Fitterer, reimplemented as a web app with vanilla TypeScript + Three.js.
+
+## What the user does
+
+- Drops an audio file into the picker, OR pastes a direct audio URL / Suno `cdn1.suno.ai/<uuid>.mp3` link / Suno `/song/<uuid>` page URL / Suno `/s/<code>` share link.
+- Optionally, types a prompt and uses the built-in Suno AI integration to generate a new track (requires the user to paste their own Suno session cookie — BYOK, no shared account).
+- Steers with arrow keys / A-D / touch swipe.
+- Aims to collect glowing blocks placed on the beat; misses cost points.
+- On finish, a scorecard shows hit / missed / total. Recently played songs are saved locally for one-tap replay.
+
+## How the game works
+
+- `decodeAudioData` on the file bytes produces a PCM buffer.
+- A pool of Web Workers runs 4096-sample FFT windows across the interleaved stream to extract per-chunk intensities and a full spectrum.
+- Low-band (~20 Hz) and high-band (~7500 Hz) beat indices place the blocks.
+- Per-chunk intensity drives track speed, hue (HSV), rocket-fire size, and the height of side hexagon pillars.
+- A cubic uniform B-spline polyline (built from the intensity signal) forms the track centerline; a second, more heavily smoothed signal drives horizontal sweeps.
+- The ship's position is `audio.currentTime / duration` mapped to spline `t` — so the game is perfectly locked to playback. No desync, no physics.
+- Only postprocessing is a single UnrealBloomPass.
+
+## Stack
+
+- TypeScript, Vite, Three.js, Web Audio API, Web Workers, Vitest.
+- No framework (no React/Vue). UI is vanilla DOM in `src/ui/*`.
+- ESM only, ES2022 target.
+
+## Credits and links
+
+- Inspired by: Audiosurf (Dylan Fitterer, 2008).
+- Suno generation uses a self-hosted [gcui-art/suno-api](https://github.com/gcui-art/suno-api) fork (BYOK model: each visitor supplies their own Suno session cookie).
+- Suno share-link resolution: a small Cloudflare Worker in `workers/suno-share-resolver/`.
+- Repo: https://github.com/donth77/vibez.surf
+- Author: Tom Donohue (https://github.com/donth77)
+
+## Non-goals
+
+- Not a Suno front-end, not a music-streaming service, and not affiliated with Suno, Audiosurf, or Dylan Fitterer.
+- Does not store uploaded audio anywhere except the user's local browser (IndexedDB, under a 10-file FIFO cap).
+- Does not track, log, or forward user prompts or cookies anywhere except the vibez.surf-operated proxy (which also does not persist them).
+
+## How to play
+
+[Play vibez.surf](https://vibez.surf/)
+
+## Technical references (for LLMs summarizing implementation)
+
+- [README.md](https://vibez.surf/README.md): user-facing quick start + setup instructions.
+- [CLAUDE.md](https://vibez.surf/CLAUDE.md): contributor / architecture notes, pipeline diagram, and coding conventions.

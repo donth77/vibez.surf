@@ -1,0 +1,20 @@
+{
+  "name": "vibez.surf",
+  "short_name": "vibez.surf",
+  "description": "Browser-based music visualizer and rhythm game. Drop any song and ride a 3D track generated from its waveform.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#05070d",
+  "theme_color": "#05070d",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "type": "image/svg+xml",
+      "sizes": "any",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["games", "music", "entertainment"]
+}

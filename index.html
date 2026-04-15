@@ -3,8 +3,79 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <meta name="description" content="vibez.surf — pick an audio file and ride a track generated from its waveform." />
-    <title>vibez.surf</title>
+    <title>vibez.surf — Browser music visualizer &amp; rhythm game</title>
+    <meta name="description" content="A free, browser-based music visualizer and rhythm game. Drop any song — MP3, Suno AI track, or direct URL — and ride a 3D track generated from its waveform. Collect blocks placed on the beats. No install, plays anywhere." />
+    <meta name="keywords" content="music visualizer, rhythm game, audiosurf clone, browser game, mp3 rhythm game, suno ai, free online game, three.js, webgl game" />
+    <meta name="author" content="Tom Donohue" />
+    <meta name="theme-color" content="#050710" />
+    <link rel="canonical" href="https://vibez.surf/" />
+
+    <!-- Favicons — single SVG file covers every modern browser. Apple
+         technically prefers PNG for apple-touch-icon, but modern iOS
+         handles SVG fine; no PNG asset needed. -->
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="apple-touch-icon" href="/favicon.svg" />
+    <link rel="manifest" href="/site.webmanifest" />
+
+    <!-- Open Graph (Facebook / Discord / iMessage / most embedders) -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="vibez.surf" />
+    <meta property="og:title" content="vibez.surf — Browser music visualizer &amp; rhythm game" />
+    <meta property="og:description" content="Drop any song and ride a 3D track generated from its waveform. Free, browser-based, no install." />
+    <meta property="og:url" content="https://vibez.surf/" />
+    <meta property="og:image" content="https://vibez.surf/og-image.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="Screenshot of vibez.surf: a spaceship riding a glowing 3D ribbon track generated from a song's waveform." />
+    <meta property="og:locale" content="en_US" />
+
+    <!-- Twitter / X card -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="vibez.surf" />
+    <meta name="twitter:description" content="Drop a song, ride a track generated from its waveform. Free browser rhythm game." />
+    <meta name="twitter:image" content="https://vibez.surf/og-image.png" />
+
+    <!-- JSON-LD structured data for Google / Bing / LLMs that honor schema.org -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@graph": [
+        {
+          "@type": "VideoGame",
+          "name": "vibez.surf",
+          "alternateName": "Vibez.surf",
+          "description": "Browser-based music visualizer and rhythm game. Drop any audio file or Suno AI track; the game analyzes it and generates a 3D track you ride to the beat, collecting blocks placed on moments of musical energy.",
+          "url": "https://vibez.surf/",
+          "image": "https://vibez.surf/og-image.png",
+          "genre": ["Rhythm", "Music", "Arcade"],
+          "applicationCategory": "Game",
+          "operatingSystem": "Web (any modern browser)",
+          "gamePlatform": ["Web Browser", "Mobile Browser"],
+          "playMode": "SinglePlayer",
+          "offers": {
+            "@type": "Offer",
+            "price": "0",
+            "priceCurrency": "USD"
+          },
+          "inLanguage": "en",
+          "author": {
+            "@type": "Person",
+            "name": "Tom Donohue",
+            "url": "https://github.com/donth77"
+          },
+          "keywords": "music visualizer, rhythm game, audiosurf, browser game, WebGL, Three.js"
+        },
+        {
+          "@type": "WebApplication",
+          "name": "vibez.surf",
+          "url": "https://vibez.surf/",
+          "applicationCategory": "GameApplication",
+          "browserRequirements": "Requires JavaScript, WebGL, and the Web Audio API.",
+          "operatingSystem": "Web"
+        }
+      ]
+    }
+    </script>
     <style>
       :root {
         color-scheme: dark;

@@ -118,9 +118,10 @@ export class BlocksManager {
    * Per-frame update. Walks every block, computes `currentBlockPercentage`
    * (the slide-in ramp), and writes its instance matrix.
    */
-  update(currentP: number, currentColor: THREE.Color, time: number): void {
+  update(currentP: number, currentColor: THREE.Color, time: number, speedFactor = 0): void {
     this.material.setTime(time);
     this.material.setColor(currentColor);
+    this.material.setSpeedFactor(speedFactor);
 
     for (let i = 0; i < this.entries.length; i++) {
       this.writeMatrixForCurrentP(i, currentP);

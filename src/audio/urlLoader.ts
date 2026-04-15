@@ -23,6 +23,22 @@ async function fetchAndDecode(
   url: string,
   onProgress?: (fraction: number) => void,
 ): Promise<LoadedAudio> {
+  // Restrict to http(s) so user-pasted URLs can't reach `data:`, `blob:`,
+  // `file:`, or `javascript:` — fetch rejects most of those anyway, but an
+  // early, clear error is better than a confusing network failure and
+  // avoids any future-browser surprise if the spec loosens.
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    throw new Error(`"${url}" is not a valid URL.`);
+  }
+  if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') {
+    throw new Error(
+      `Unsupported URL scheme "${parsed.protocol}" — paste an https:// link to an audio file.`,
+    );
+  }
+
   let res: Response;
   try {
     res = await fetch(url, { mode: 'cors', credentials: 'omit' });

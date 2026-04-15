@@ -18,18 +18,26 @@
  */
 
 export interface Env {
-  /** Optional allowlist; leave unset to allow all origins. */
+  /** Allowlist for CORS. Default is the production site; override per-env. */
   ALLOWED_ORIGIN?: string;
+  /**
+   * Shared secret — when set, requests must present a matching `X-API-Key`
+   * header (or `?key=` query param, for CORS-friendly GETs). Ships in the
+   * client bundle so it's not a real secret, but it blocks drive-by curl
+   * abuse that would otherwise drain the free-tier quota.
+   */
+  API_KEY?: string;
 }
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
-    const origin = env.ALLOWED_ORIGIN ?? '*';
+    const origin = env.ALLOWED_ORIGIN ?? 'https://vibez.surf';
     const corsHeaders: HeadersInit = {
       'Access-Control-Allow-Origin': origin,
       'Access-Control-Allow-Methods': 'GET, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type',
+      'Access-Control-Allow-Headers': 'Content-Type, X-API-Key',
       'Access-Control-Max-Age': '86400',
+      'Vary': 'Origin',
     };
 
     if (request.method === 'OPTIONS') {
@@ -40,18 +48,32 @@ export default {
     }
 
     const url = new URL(request.url);
+
+    // Optional shared-secret gate. Accept the key from either the header
+    // (preferred) or a `?key=` query param (for environments where custom
+    // headers trigger preflight overhead).
+    if (env.API_KEY) {
+      const provided = request.headers.get('X-API-Key') ?? url.searchParams.get('key') ?? '';
+      if (!timingSafeEqual(provided, env.API_KEY)) {
+        return json({ error: 'unauthorized' }, 401, corsHeaders);
+      }
+    }
+
     const target = url.searchParams.get('url');
     if (!target) {
       return json({ error: 'missing ?url=…' }, 400, corsHeaders);
     }
 
-    // Only accept suno.com URLs so the worker can't be abused as a
-    // general-purpose scraper.
+    // Only accept https suno.com URLs so the worker can't be abused as a
+    // general-purpose scraper or pointed at non-web schemes.
     let parsed: URL;
     try {
       parsed = new URL(target);
     } catch {
       return json({ error: 'invalid url' }, 400, corsHeaders);
+    }
+    if (parsed.protocol !== 'https:') {
+      return json({ error: 'only https URLs are supported' }, 400, corsHeaders);
     }
     if (!/(^|\.)suno\.com$/i.test(parsed.hostname)) {
       return json({ error: 'only suno.com URLs are supported' }, 400, corsHeaders);
@@ -132,6 +154,15 @@ export default {
     let title = ogTitle?.[1] ?? plainTitle?.[1] ?? '';
     // Strip " | Suno" suffix that the site appends.
     title = title.replace(/\s*[|·]\s*Suno\s*$/i, '').trim();
+    // Defense-in-depth: suno.com could serve a title containing HTML /
+    // control chars that would bite any future client path that forgets to
+    // escape. Drop anything outside a reasonable printable set and cap
+    // length so a long title can't DoS a naive consumer.
+    title = title
+      .replace(/[\x00-\x1f\x7f]/g, '')
+      .replace(/[<>]/g, '')
+      .slice(0, 200)
+      .trim();
 
     return json(
       {
@@ -151,4 +182,12 @@ function json(body: unknown, status: number, headers: HeadersInit): Response {
     status,
     headers: { 'Content-Type': 'application/json', ...headers },
   });
+}
+
+/** Constant-time string compare to avoid leaking the API key via timing. */
+function timingSafeEqual(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return diff === 0;
 }
