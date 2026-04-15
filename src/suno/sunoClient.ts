@@ -26,17 +26,22 @@ const TOKEN_KEY = 'vibez.surf.sunoToken';
 const MODEL_KEY = 'vibez.surf.sunoModel';
 
 /**
- * Suno model IDs (as the gcui-art proxy expects them). Order is newest →
- * oldest; the first entry is the default when nothing's saved.
+ * Suno model IDs. Suno's newer models use internal codenames (e.g. v5.5
+ * ships as `chirp-crow`) rather than version-numbered ids. IDs here were
+ * verified against Suno's own frontend payload on suno.com — if a future
+ * version ships, grab the new id from Suno's DevTools Network tab on
+ * `/api/generate/v2-web/` (`mv` field) and add it here.
+ *
+ * Order is newest → oldest; first entry is the default when nothing's saved.
  */
 export const SUNO_MODELS = [
-  { id: 'chirp-v5',   label: 'v5 (newest)' },
+  { id: 'chirp-crow', label: 'v5' },
   { id: 'chirp-v4-5', label: 'v4.5' },
   { id: 'chirp-v4',   label: 'v4' },
   { id: 'chirp-v3-5', label: 'v3.5' },
 ] as const;
 export type SunoModelId = typeof SUNO_MODELS[number]['id'];
-export const DEFAULT_SUNO_MODEL: SunoModelId = 'chirp-v5';
+export const DEFAULT_SUNO_MODEL: SunoModelId = 'chirp-crow';
 
 export function loadSunoModel(): SunoModelId {
   const raw = (() => { try { return localStorage.getItem(MODEL_KEY); } catch { return null; } })();
