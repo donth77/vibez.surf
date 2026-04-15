@@ -178,9 +178,10 @@ function showEndSongPanel(): void {
       },
       onBack: () => {
         endSongPanel?.hide();
-        // Simplest "back to menu" = reload the page — reshows the file
-        // browser with a clean game state.
-        location.reload();
+        // Fade-to-black overlay before `location.reload()` so the user
+        // doesn't see the browser's default gray unload flash. Full
+        // reload is still the simplest way to reset game state.
+        fadeOutAndReload();
       },
     },
   );
@@ -426,7 +427,7 @@ async function startGame(loaded: LoadedAudio, title: string, source: CurrentSour
         if (player) await player.startPreRoll(PREROLL_SECONDS, preRollDistance);
         currentAudio.element.play().catch(() => {});
       },
-      onBack: () => location.reload(),
+      onBack: () => fadeOutAndReload(),
     });
     pauseMenu.setOnTapToggle(() => {
       if (!currentAudio) return;
@@ -833,6 +834,29 @@ function mountAudioHud() {
  * and asymptotes slower — matches the "90% done in 60% of the time" vibe
  * users expect from progress bars.
  */
+/**
+ * Fade the page to the app background color, then reload. `location.reload()`
+ * on its own shows the browser's default gray unload flash between the
+ * old DOM tearing down and the new one painting — jarring when coming
+ * back to the menu. The overlay sits at z-index max, covers the whole
+ * viewport, and matches the start-screen background so the transition
+ * reads as "dimming to menu" instead of "page broke for a frame".
+ */
+function fadeOutAndReload(): void {
+  const fade = document.createElement('div');
+  fade.style.cssText =
+    'position:fixed;inset:0;z-index:2147483647;background:#050710;' +
+    'opacity:0;pointer-events:none;transition:opacity 140ms ease-out;';
+  document.body.appendChild(fade);
+  // Force a reflow so the opacity transition actually fires (browsers
+  // batch style changes on the same frame otherwise).
+  void fade.getBoundingClientRect();
+  fade.style.opacity = '1';
+  // Reload once the fade finishes — by then the user's eye is on black,
+  // so the reload flash is invisible behind the overlay.
+  setTimeout(() => location.reload(), 160);
+}
+
 function runSunoProgressTimer(getOverlay: () => LoadingOverlay | null, expectedSec: number): () => void {
   const start = performance.now();
   const tau = expectedSec / 3;
