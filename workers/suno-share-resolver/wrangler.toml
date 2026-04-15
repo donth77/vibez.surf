@@ -2,8 +2,9 @@ name = "suno-share-resolver"
 main = "src/worker.ts"
 compatibility_date = "2024-06-01"
 
-# Restrict CORS to vibez.surf only. Without this set, anyone's site can
-# call the Worker and (if viral) drain the 100k/day free-tier quota.
-# Override per-env via Cloudflare dashboard → Worker → Settings → Variables.
+# Comma-separated CORS allowlist. Includes localhost:5173 for Vite dev
+# so you can test against the deployed Worker without rebuilding just to
+# ship a different origin. Override per-env via Cloudflare dashboard →
+# Worker → Settings → Variables.
 [vars]
-ALLOWED_ORIGIN = "https://vibez.surf"
+ALLOWED_ORIGIN = "https://vibez.surf,https://www.vibez.surf,http://localhost:5173"

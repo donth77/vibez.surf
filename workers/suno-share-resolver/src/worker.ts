@@ -18,7 +18,8 @@
  */
 
 export interface Env {
-  /** Allowlist for CORS. Default is the production site; override per-env. */
+  /** Comma-separated CORS allowlist. Default covers the production site
+   *  and local Vite dev. Override via `wrangler.toml` or Cloudflare env. */
   ALLOWED_ORIGIN?: string;
   /**
    * Shared secret — when set, requests must present a matching `X-API-Key`
@@ -31,14 +32,25 @@ export interface Env {
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
-    const origin = env.ALLOWED_ORIGIN ?? 'https://vibez.surf';
-    const corsHeaders: HeadersInit = {
-      'Access-Control-Allow-Origin': origin,
+    // Echo the request's Origin header back if it matches the allowlist;
+    // otherwise omit the ACAO header entirely so the browser correctly
+    // rejects the response. A single '*' in ALLOWED_ORIGIN disables the
+    // check (useful for public deployments).
+    const allowed = (env.ALLOWED_ORIGIN ?? 'https://vibez.surf,https://www.vibez.surf,http://localhost:5173')
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean);
+    const reqOrigin = request.headers.get('Origin') ?? '';
+    const allowOrigin = allowed.includes('*')
+      ? '*'
+      : allowed.includes(reqOrigin) ? reqOrigin : '';
+    const corsHeaders: Record<string, string> = {
       'Access-Control-Allow-Methods': 'GET, OPTIONS',
       'Access-Control-Allow-Headers': 'Content-Type, X-API-Key',
       'Access-Control-Max-Age': '86400',
       'Vary': 'Origin',
     };
+    if (allowOrigin) corsHeaders['Access-Control-Allow-Origin'] = allowOrigin;
 
     if (request.method === 'OPTIONS') {
       return new Response(null, { status: 204, headers: corsHeaders });
