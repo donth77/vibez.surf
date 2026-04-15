@@ -115,7 +115,7 @@ let paused = false;
 let currentSongTitle = '';
 /** Source context for the currently-playing song — used by the "recently
  *  played" list so replays know what URL / prompt to re-request. File-backed
- *  entries carry no replayable reference (File objects don't survive a reload). */
+ *  entries carry no replayable handle (File objects don't survive a reload). */
 interface CurrentSource {
   kind: SourceKind;
   sourceUrl?: string;

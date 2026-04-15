@@ -9,10 +9,10 @@ export interface LoadedAudio {
    *
    * Mono input is upcast to a 1-channel "interleaved" array (just the channel itself).
    *
-   * NOTE: this layout is required for parity with the reference analysis.
-   * The intensity/spectrum passes chunk the interleaved stream directly, and
-   * `getBeatIndexes` factors `channels` into its skip math. Averaging to
-   * mono would change every beat index.
+   * NOTE: this layout is load-bearing. The intensity/spectrum passes
+   * chunk the interleaved stream directly, and `getBeatIndexes` factors
+   * `channels` into its skip math. Averaging to mono would change every
+   * beat index.
    */
   samples: Float32Array;
   /** Free the blob URL when done. */

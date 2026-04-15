@@ -10,9 +10,8 @@ import { createBlockMaterial, type BlockMaterial } from './blockMaterial';
  *    rule (§4.8). Discards high beats within ±5 of any low beat.
  *  - Holds a single `InstancedMesh` of all blocks. Block geometry:
  *    BoxGeometry(1.75, 0.35, 0.75) with Y offset 0.25 (authored).
- *  - Per-frame, walks each block and writes its instance matrix from the
- *    linear interpolation between adjacent **raw** spline points (the
- *    reference algorithm uses the raw polyline here, see §4.7).
+ *  - Per-frame, walks each block and writes its instance matrix, lerping
+ *    between adjacent raw spline points.
  *  - Per-instance `aPickedAt` attribute is created here so the M7 pickup
  *    handler can flip an entry from -1 to "now" without touching geometry.
  *
@@ -170,7 +169,8 @@ export class BlocksManager {
       previousIndex = beatIndex + noise;
 
       // Formula: `(beatIndex + 4) / (splineLen - 4)`. The +4/-4 looks
-      // off-by-something but is verbatim from the reference algorithm.
+      // off-by-something but is intentional — don't "correct" it without
+      // re-running the parity tests.
       const endP = (beatIndex + 4) / denom;
       const laneRaw = (((beatIndex + noise) % 3) - 1) as -1 | 0 | 1;
       const zOffset = laneRaw * BLOCKS_DEFAULTS.maxDistanceFromCenter;
@@ -195,12 +195,10 @@ export class BlocksManager {
 
   /**
    * Sample the SPLINE (not the raw polyline) for both position and tangent.
-   * The reference algorithm does a linear lerp between adjacent raw spline
-   * control points, but the TRACK MESH is built from the smooth B-spline.
-   * At curvature changes those two paths diverge by a few units, causing
-   * visible "hovering" blocks that don't touch the ribbon. Riding the
-   * spline keeps blocks visually glued to the track surface at the cost
-   * of strict reference-faithfulness here.
+   * A linear lerp between raw spline control points diverges from the
+   * smooth B-spline by a few units at curvature changes, causing visible
+   * "hovering" blocks that don't touch the ribbon. Riding the spline
+   * keeps blocks visually glued to the track surface.
    */
   private computeMatrix(positionPercentage: number, laneOffset: number): void {
     const spline = this.trackData.spline;

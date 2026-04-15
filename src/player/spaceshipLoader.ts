@@ -16,7 +16,7 @@ import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader.js';
  *   Uper thruster:      metallic=0.877, smoothness=0.392, emission=black
  *
  * So the ship reads as a near-black silhouette with yellow glowing accents on
- * most surfaces and a chrome thruster — the look in the reference GIF.
+ * most surfaces and a chrome thruster.
  */
 
 interface SubMatSpec {

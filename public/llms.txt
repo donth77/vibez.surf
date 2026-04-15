@@ -45,8 +45,3 @@ vibez.surf runs entirely in the browser — no install, no accounts for the core
 ## How to play
 
 [Play vibez.surf](https://vibez.surf/)
-
-## Technical references (for LLMs summarizing implementation)
-
-- [README.md](https://vibez.surf/README.md): user-facing quick start + setup instructions.
-- [CLAUDE.md](https://vibez.surf/CLAUDE.md): contributor / architecture notes, pipeline diagram, and coding conventions.

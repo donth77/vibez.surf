@@ -21,7 +21,7 @@ export const TRACK_DEFAULTS = {
   minSpeed: 0.3,
   maxSpeed: 3,
 
-  // Horizontal sweep — additional parameter beyond the reference algorithm.
+  // Horizontal sweep parameter.
   // Drives gentle left/right curves in Z using a more heavily-smoothed copy
   // of the intensity signal, so the track's horizontal arc evolves on a
   // longer timescale than its vertical bumps. Magnitudes kept modest so the

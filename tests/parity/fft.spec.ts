@@ -75,11 +75,6 @@ describe('Intensities', () => {
   });
 });
 
-// TODO: §13 parity tests (require Unity-side dump). When available, add
-//   tests/parity/__fixtures__/<song>.json with rawIntensities[0..9],
-//   normalizedIntensities[0..9], slopes[0..9], slopeIntensity, colors[10/100],
-//   splinePoints[0..4], lowBeatIndexes (full), highBeatIndexes (full),
-//   totalTrackPoints — and assert against them.
 
 function makeNoise(n: number, seed: number): Float32Array {
   // Simple LCG; deterministic across runs/platforms.

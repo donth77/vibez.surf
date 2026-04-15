@@ -23,7 +23,7 @@ void main() {
 }
 `;
 
-// Track shader. Layout (corrected against reference GIF):
+// Track shader. Layout:
 //   - Body: BLACK (no body color tint).
 //   - Side borders (long edges, V near 0 and V near 1): bright with the
 //     per-chunk slope-driven vertex color — this is where the song's hue

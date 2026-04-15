@@ -136,7 +136,7 @@ public/assets/ OBJ + textures
   duplication; including that vertex would produce a collapsed triangle.
 - `BlocksManager.computeMatrix` samples the smooth B-spline (not the raw
   polyline) so blocks don't visibly hover above the ribbon at curvature
-  changes. This is a deliberate divergence from the reference algorithm.
+  changes.
 - Renderer `outputColorSpace` is sRGB; vertex colors in the track mesh are
   stored linear-light. Don't double-convert.
 

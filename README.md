@@ -1,4 +1,4 @@
-# vibez.surf
+# [vibez.surf](https://vibez.surf)
 
 A browser-based music visualizer and rhythm game. Pick any song; the game
 analyzes it and generates a 3D track you ride to the beat, picking up blocks
@@ -42,27 +42,6 @@ Three ways to start a song:
 The URL + AI options are optional. Neither is needed to play — the file
 picker works out of the box.
 
-### Suno generation setup (site operator)
-
-Two pieces of infrastructure:
-
-1. **Suno generation proxy** — a deployed [gcui-art/suno-api](https://github.com/gcui-art/suno-api)
-   fork that handles Suno's hCaptcha via 2Captcha. Bake its URL into the
-   build via `VITE_SUNO_API_URL`, with an optional `VITE_SUNO_API_URL_FALLBACK`
-   for a secondary host (primary on Vercel free is useful only for
-   non-captcha endpoints; use a long-running host for the fallback since
-   captcha-solving routinely exceeds Vercel's 10s serverless limit).
-
-2. **Suno share-link resolver** (optional) — a small Cloudflare Worker in
-   [`workers/suno-share-resolver/`](workers/suno-share-resolver/) that
-   converts `suno.com/s/<code>` URLs to direct CDN links. Deploy with a
-   free Cloudflare account (`npx wrangler deploy`), then set
-   `VITE_SUNO_RESOLVER` to the resulting URL. Direct `cdn1.suno.ai/<uuid>.mp3`
-   links work without the resolver.
-
-Both are configured at build time via env vars — see [`.env.example`](.env.example).
-Self-hosters can override with their own values.
-
 ## Debug
 
 Append `?debug` to the URL to show the FPS counter and a bottom-of-screen
@@ -80,7 +59,3 @@ pnpm test:watch   # watch mode
 ## Built with
 
 TypeScript · Vite · Three.js · Web Audio API · Web Workers · Vitest.
-
----
-
-Contributor/architecture notes live in [CLAUDE.md](CLAUDE.md).

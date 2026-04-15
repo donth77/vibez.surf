@@ -34,8 +34,9 @@ export function buildSplineMesh(
   const color = new THREE.Color();
   const desired = new THREE.Vector3().copy(bitangent);
 
-  // U-coordinate normalisation constant — reads from t=1 even though the mesh
-  // doesn't actually include that vertex (this is the reference behavior).
+  // U-coordinate normalisation constant — reads from t=1 even though the
+  // mesh doesn't actually include that vertex. This is intentional; the
+  // parity tests pin it.
   spline.getPointAt(1, point);
   spline.getBitangentPerpendicularToTangent(1, desired, bt);
   const lastV1x = point.x + bt.x * halfThickness;

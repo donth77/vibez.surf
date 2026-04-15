@@ -51,10 +51,10 @@ export class FireworksManager {
     this.particlesPerBurst = opts.particlesPerBurst ?? 70;
     this.dpr = Math.min(window.devicePixelRatio ?? 1, 2);
 
-    // Particle-size ranges, converted from the reference's world-size units
-    // to screen-space px. The landscape range (0.45..0.8) sized ~50–90 px on
-    // the reference's fullscreen render; portrait (0.3..0.65) ~30–65 px. We
-    // use viewport-scaled radii instead for responsive sizing.
+    // Particle-size ranges in screen-space px, scaled by the viewport
+    // short-edge for responsive sizing. Landscape uses bigger bursts
+    // (0.45..0.8 scaled → ~50–90 px); portrait is tighter (0.3..0.65
+    // → ~30–65 px).
     const landscape = window.innerWidth >= window.innerHeight;
     this.lifetime = landscape ? 1.5 : 0.9;
     const sMin = landscape ? 0.45 : 0.3;

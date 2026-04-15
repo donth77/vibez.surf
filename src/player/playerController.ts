@@ -132,7 +132,7 @@ export class PlayerController {
     // visible lateral sway beyond the outer block lanes (±2.2).
     this.maxInputOffset = opts.maxInputOffset ?? 5;
     // Camera offsets are chosen at startup by screen orientation (landscape
-    // vs portrait), mirroring the reference behavior.
+    // vs portrait).
     const landscape = window.innerWidth >= window.innerHeight;
     this.cameraNear = opts.cameraNear ?? (landscape
       ? new THREE.Vector3(0, 1.376, -2.143)

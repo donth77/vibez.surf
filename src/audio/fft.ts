@@ -1,7 +1,7 @@
 /**
- * Reference-compatible FFT. Preserves two important quirks of the reference
- * algorithm that look like bugs but are the spec — the rest of the pipeline
- * (beat detection, block placement) was tuned against this exact transform:
+ * FFT with two intentional quirks that look like bugs but are the spec —
+ * the rest of the pipeline (beat detection, block placement) is tuned
+ * against this exact transform:
  *
  *  1. The window is a 3-coefficient truncated form (`a0 - a1·cos(2πn/(N-1))
  *     + a2·cos(4πn/(N-1))`), not the canonical 4-term Blackman-Harris.
@@ -67,7 +67,7 @@ export function fftMagnitudes(
       for (let k = 0; k < half; k++) {
         const idxA = j + k;
         const idxB = j + k + half;
-        // t = w * spectrum[idxB]   (element-wise, per the reference)
+        // t = w * spectrum[idxB]   (element-wise)
         const tRe = wRe * scratchRe[idxB]!;
         const tIm = wIm * scratchIm[idxB]!;
         const uRe = scratchRe[idxA]!;
@@ -107,8 +107,8 @@ export function getBitReversalPermutation(length: number): Uint32Array {
 }
 
 /**
- * The 3-coefficient truncated Blackman-Harris window used by the reference.
- * Do not "fix" by adding the missing `a3·cos(6πn/(N-1))` term — see the file header.
+ * The 3-coefficient truncated Blackman-Harris window. Do not "fix" by
+ * adding the missing `a3·cos(6πn/(N-1))` term — see the file header.
  */
 export function getTruncatedBlackmanHarrisWindow(length: number): Float32Array {
   const out = new Float32Array(length);

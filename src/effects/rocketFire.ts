@@ -1,8 +1,8 @@
 import * as THREE from 'three';
 
 /**
- * Ship rocket-fire trail. Matches the reference Audiosurf visual: a solid
- * teardrop-shaped flame per thruster (not a cloud of point particles).
+ * Ship rocket-fire trail: a solid teardrop-shaped flame per thruster
+ * (not a cloud of point particles).
  *
  * Built as a cone mesh aligned along -Z (back of ship). The vertex shader
  * exposes a `vAlongLength` varying (0 at base → 1 at tip) which the fragment
