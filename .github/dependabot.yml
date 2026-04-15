@@ -1,0 +1,49 @@
+# Dependabot config for vibez.surf.
+#
+# Weekly cadence — daily is noisy for a personal project, monthly lags too
+# far behind for security. Grouping related packages keeps one release from
+# opening multiple PRs.
+#
+# Security-only updates are handled separately by the "Dependabot security
+# updates" toggle in GitHub's Code security settings and fire immediately
+# regardless of this schedule.
+version: 2
+updates:
+  # Main app (Vite + Three.js + TypeScript)
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 5
+    groups:
+      three:
+        patterns:
+          - "three"
+          - "@types/three"
+      vite:
+        patterns:
+          - "vite"
+          - "@vitejs/*"
+      typescript:
+        patterns:
+          - "typescript"
+          - "@types/*"
+      vitest:
+        patterns:
+          - "vitest"
+          - "@vitest/*"
+
+  # Cloudflare Worker (suno-share-resolver)
+  - package-ecosystem: "npm"
+    directory: "/workers/suno-share-resolver"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 3
+
+  # GitHub Actions (empty today, but future-proofs the config)
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "monthly"

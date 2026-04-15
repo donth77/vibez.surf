@@ -63,20 +63,76 @@ export function isSunoEnabled(): boolean {
   return getApiUrls().length > 0;
 }
 
+/**
+ * Saved tokens self-expire after this many days. Suno cookies last a few
+ * weeks in practice, so we pick a window that's typically shorter than the
+ * real lifetime — any value that expires on our side before Suno revokes
+ * shrinks the window where a leaked cookie (stolen dev-console session,
+ * shared device) remains useful.
+ */
+const TOKEN_TTL_DAYS = 21;
+const TOKEN_TTL_MS = TOKEN_TTL_DAYS * 24 * 60 * 60 * 1000;
+
+interface StoredToken {
+  token: string;
+  /** Unix ms when the token was saved. Null means pre-TTL schema (bare string). */
+  savedAt: number;
+}
+
+/**
+ * Read the stored token, applying TTL expiry. Returns null if:
+ *   - nothing's stored
+ *   - the stored entry is older than TOKEN_TTL_DAYS (entry is auto-cleared)
+ *   - localStorage throws (Safari private mode, etc.)
+ *
+ * Backward-compatible with the original schema where the value was a bare
+ * string with no expiry — those entries are auto-migrated to the new
+ * schema on read, stamped with `savedAt = now`, so they get a fresh TTL.
+ */
 export function loadSunoToken(): string | null {
+  let raw: string | null;
   try {
-    return localStorage.getItem(TOKEN_KEY);
+    raw = localStorage.getItem(TOKEN_KEY);
   } catch {
     return null;
   }
+  if (!raw) return null;
+
+  // New schema: JSON { token, savedAt }. Legacy: plain cookie string.
+  let entry: StoredToken;
+  if (raw.startsWith('{')) {
+    try {
+      const parsed = JSON.parse(raw) as Partial<StoredToken>;
+      if (typeof parsed.token !== 'string' || typeof parsed.savedAt !== 'number') {
+        clearSunoToken();
+        return null;
+      }
+      entry = { token: parsed.token, savedAt: parsed.savedAt };
+    } catch {
+      clearSunoToken();
+      return null;
+    }
+  } else {
+    // Legacy bare-string entry — migrate so the next load sees the new
+    // schema and can apply TTL.
+    entry = { token: raw, savedAt: Date.now() };
+    try { localStorage.setItem(TOKEN_KEY, JSON.stringify(entry)); } catch {}
+  }
+
+  if (Date.now() - entry.savedAt > TOKEN_TTL_MS) {
+    clearSunoToken();
+    return null;
+  }
+  return entry.token;
 }
 
 export function saveSunoToken(token: string): void {
-  localStorage.setItem(TOKEN_KEY, token);
+  const entry: StoredToken = { token, savedAt: Date.now() };
+  localStorage.setItem(TOKEN_KEY, JSON.stringify(entry));
 }
 
 export function clearSunoToken(): void {
-  localStorage.removeItem(TOKEN_KEY);
+  try { localStorage.removeItem(TOKEN_KEY); } catch {}
 }
 
 /** True when both the proxy URL is configured AND the user has a cookie saved. */
