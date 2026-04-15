@@ -104,7 +104,12 @@ function authHeaders(): Record<string, string> {
       'Suno AI" section and paste your cookie first.',
     );
   }
-  return { 'X-Suno-Cookie': token };
+  const headers: Record<string, string> = { 'X-Suno-Cookie': token };
+  // Shared-secret gate on the proxy. Ships in the bundle (so not a
+  // real secret), but blocks drive-by curl abuse that skips CORS.
+  const apiKey = (import.meta.env.VITE_SUNO_API_KEY as string | undefined) || '';
+  if (apiKey) headers['X-API-Key'] = apiKey;
+  return headers;
 }
 
 /**

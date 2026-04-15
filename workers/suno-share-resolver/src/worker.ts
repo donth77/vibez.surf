@@ -57,12 +57,16 @@ export default {
       return json({ error: 'only suno.com URLs are supported' }, 400, corsHeaders);
     }
 
-    // Follow redirects; Cloudflare fetch does this by default.
+    // Follow redirects; Cloudflare fetch does this by default. UA
+    // mimics a real browser so Suno doesn't block us for looking bot-y.
     let upstream: Response;
     try {
       upstream = await fetch(parsed.toString(), {
         redirect: 'follow',
-        headers: { 'User-Agent': 'Mozilla/5.0 (Suno share resolver)' },
+        headers: {
+          'User-Agent':
+            'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15',
+        },
       });
     } catch (err) {
       return json(
@@ -99,7 +103,28 @@ export default {
     // Scrape a <title> tag. Suno pages are client-rendered so the <title>
     // usually reads "Suno" generically, but og:title (set server-side)
     // carries the real song name.
-    const html = await upstream.text();
+    //
+    // Cap at 512 KB so a malicious / oversized upstream response can't
+    // OOM the Worker (128 MB memory limit) — og:title always sits in
+    // the <head>, so we only need the first ~50 KB realistically.
+    const MAX_BYTES = 512 * 1024;
+    const reader = upstream.body?.getReader();
+    let html = '';
+    if (reader) {
+      const decoder = new TextDecoder();
+      let received = 0;
+      // eslint-disable-next-line no-constant-condition
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        received += value.byteLength;
+        html += decoder.decode(value, { stream: true });
+        if (received >= MAX_BYTES) {
+          await reader.cancel();
+          break;
+        }
+      }
+    }
     const ogTitle = html.match(
       /<meta[^>]+property=["']og:title["'][^>]+content=["']([^"']+)["']/i,
     );

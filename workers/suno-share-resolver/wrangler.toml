@@ -2,6 +2,8 @@ name = "suno-share-resolver"
 main = "src/worker.ts"
 compatibility_date = "2024-06-01"
 
-# Optional — restrict CORS to your app origin instead of "*".
-# [vars]
-# ALLOWED_ORIGIN = "https://your-app.example.com"
+# Restrict CORS to vibez.surf only. Without this set, anyone's site can
+# call the Worker and (if viral) drain the 100k/day free-tier quota.
+# Override per-env via Cloudflare dashboard → Worker → Settings → Variables.
+[vars]
+ALLOWED_ORIGIN = "https://vibez.surf"
