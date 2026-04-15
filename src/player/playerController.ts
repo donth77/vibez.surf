@@ -80,6 +80,21 @@ export class PlayerController {
   /** Two rocket-fire emitters (left + right thruster). */
   private readonly rocketFires: RocketFire[] = [];
 
+  // Pre-roll state — ship cruises along the runway (behind the spline origin)
+  // at constant speed before audio starts. During pre-roll the normal audio-
+  // driven position / orientation code is bypassed.
+  private preRollActive = false;
+  private preRollElapsed = 0;
+  private preRollSeconds = 0;
+  private preRollDistance = 0;
+  private preRollResolve: (() => void) | null = null;
+  private readonly _preRollOrigin = new THREE.Vector3();
+  private readonly _preRollTangent = new THREE.Vector3();
+  /** Runway bitangent (≈ world +Z, perpendicular to the straight runway).
+   *  Captured at pre-roll start so input-driven lateral steering works the
+   *  same way it does during normal play. */
+  private readonly _preRollBitangent = new THREE.Vector3();
+
   // Scratch.
   private readonly _point = new THREE.Vector3();
   private readonly _tangent = new THREE.Vector3();
@@ -251,8 +266,117 @@ export class PlayerController {
     return this.trackData.spline.getColorAt(t, out);
   }
 
+  /**
+   * Start a pre-roll cruise. Ship is placed `distance` units BEHIND the
+   * spline origin (along -tangent), then linearly translated toward the
+   * origin over `seconds`. Audio stays paused during this window; the
+   * returned promise resolves when the ship arrives at the origin so the
+   * caller can kick playback.
+   */
+  startPreRoll(seconds: number, distance: number): Promise<void> {
+    // If a previous pre-roll is somehow still pending, resolve it so we
+    // don't leak promises.
+    this.preRollResolve?.();
+    this.preRollActive = true;
+    this.preRollElapsed = 0;
+    this.preRollSeconds = seconds;
+    this.preRollDistance = distance;
+    this.trackData.spline.getPointAt(0, this._preRollOrigin);
+    this.trackData.spline.getTangentAt(0, this._preRollTangent);
+    if (this._preRollTangent.lengthSq() < 1e-8) this._preRollTangent.set(1, 0, 0);
+    this._preRollTangent.normalize();
+    // Runway bitangent = spline bitangent at t=0 — keeps steering direction
+    // consistent with what normal play will use at currentP=0.
+    this.trackData.spline.getBitangentPerpendicularToTangent(
+      0, this._bitangentDesired, this._preRollBitangent,
+    );
+    // Zero out any carried-over lateral input so the ship starts centred.
+    this.inputScalar = 0;
+    this.mouseDeltaX = 0;
+    this.frameSwipeDelta = 0;
+    this.currentRoll = 0;
+    // Seed currentForward to tangent so the first applyForward() doesn't snap.
+    this._currentForward.copy(this._preRollTangent);
+    return new Promise<void>((resolve) => {
+      this.preRollResolve = resolve;
+    });
+  }
+
+  private updatePreRoll(dt: number): void {
+    this.preRollElapsed += dt;
+    const t = Math.min(1, this.preRollElapsed / this.preRollSeconds);
+    // CONSTANT-velocity cruise. Distance is sized by the caller so that
+    // this velocity (= distance/seconds) equals the song's velocity at
+    // currentP=0, giving a seamless handoff when audio starts.
+    const backOffset = this.preRollDistance * (1 - t);
+
+    // Same input → lateral-offset math as normal update so steering feels
+    // identical during the runway glide.
+    const keyInput = -this.keyAxis * KEYBOARD_LATERAL_PER_SEC * dt;
+    const swipeInput = this.mouseDeltaX * PIXELS_TO_INPUT_AXIS;
+    this.frameSwipeDelta = this.mouseDeltaX;
+    this.mouseDeltaX = 0;
+    this.inputScalar += keyInput + swipeInput;
+    if (this.inputScalar > this.maxInputOffset) this.inputScalar = this.maxInputOffset;
+    else if (this.inputScalar < -this.maxInputOffset) this.inputScalar = -this.maxInputOffset;
+
+    // Position = origin + tangent · -backOffset + bitangent · inputScalar.
+    this.root.position.copy(this._preRollOrigin)
+      .addScaledVector(this._preRollTangent, -backOffset)
+      .addScaledVector(this._preRollBitangent, this.inputScalar);
+
+    // Orient forward along the runway tangent (straight).
+    this.applyForward(this._preRollTangent);
+
+    // Spaceship tilt + bob — same animation as normal play so the ship
+    // doesn't feel dead during the cruise.
+    this.updateSpaceshipAnimation(dt);
+
+    // Color / emissive / rocket fire from spline start (first chunk color).
+    this.trackData.spline.getColorAt(0, this._color);
+    for (const mat of this.syncedEmissiveMaterials) {
+      mat.emissive.copy(this._color);
+    }
+    // Rocket intensity: use the first chunk's normalized intensity so the
+    // thrust size at the pre-roll→song handoff matches exactly what the
+    // normal update will produce at currentP=0 (prevents a visible pulse).
+    const firstIntensity = this.trackData.normalizedIntensities[0] ?? 0.5;
+    for (const rf of this.rocketFires) {
+      rf.update(performance.now() / 1000, firstIntensity, this._color, ROCKET_MIN_SPEED, ROCKET_MAX_SPEED);
+    }
+
+    // Camera: match what the normal update would produce at p=0 so there's
+    // no snap when audio starts. Same hue→speed→lerp math as the main path.
+    this._color.getHSL(this._hsl);
+    const currentSpeed = clamp01((0.83 - this._hsl.h) / 0.83);
+    this.camera.position.lerpVectors(this.cameraFar, this.cameraNear, currentSpeed);
+    _scratchVec.set(
+      this.camera.position.x,
+      this.camera.position.y - 20 * Math.sin(CAMERA_PITCH_RAD),
+      this.camera.position.z + 20 * Math.cos(CAMERA_PITCH_RAD),
+    );
+    this.cameraRig.localToWorld(_scratchVec);
+    this.camera.lookAt(_scratchVec);
+
+    if (t >= 1) {
+      this.preRollActive = false;
+      const resolve = this.preRollResolve;
+      this.preRollResolve = null;
+      resolve?.();
+    }
+  }
+
+  /** True while the ship is gliding along the runway, before audio starts. */
+  get isPreRolling(): boolean {
+    return this.preRollActive;
+  }
+
   /** Call once per frame. Dt in seconds. */
   update(dt: number): void {
+    if (this.preRollActive) {
+      this.updatePreRoll(dt);
+      return;
+    }
     const duration = this.audio.duration;
     if (!isFinite(duration) || duration <= 0) return;
     const currentP = Math.min(0.9999, Math.max(0, this.audio.currentTime / duration));
@@ -406,7 +530,7 @@ export class PlayerController {
 const _scratchMat = new THREE.Matrix4();
 const _scratchVec = new THREE.Vector3();
 const CAMERA_PITCH_RAD = (15 * Math.PI) / 180;
-const PIXELS_TO_INPUT_AXIS = 0.05;
+const PIXELS_TO_INPUT_AXIS = 0.025;
 /**
  * Lateral movement rate when a key is held (bitangent units per second).
  * Scaled up for the wider maxInputOffset

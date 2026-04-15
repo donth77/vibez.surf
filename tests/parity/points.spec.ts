@@ -5,7 +5,7 @@ describe('PointsManager — port of PointsManager.cs', () => {
   it('computes the theoretical total via the cumulative curve', () => {
     const pm = new PointsManager();
     pm.computeTotal(5);
-    // Per C#: for i=0..blocksCount-1: total += inc; inc = min(200, inc + 4)
+    // for i=0..blocksCount-1: total += inc; inc = min(200, inc + 4)
     // Initial inc=1. Sequence: 1,5,9,13,17 → sum = 45.
     expect(pm.totalTrackPoints).toBe(45);
   });
@@ -54,7 +54,7 @@ describe('PointsManager — port of PointsManager.cs', () => {
     expect(pm.currentPoints).toBe(0);
   });
 
-  it('label values match the C# source quirks', () => {
+  it('label values match the source quirks', () => {
     const pm = new PointsManager();
     pm.blockPicked();
     // Post-bump increment = 5 → label reads "+5" for the FIRST pick (even though

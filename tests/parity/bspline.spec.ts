@@ -18,7 +18,7 @@ describe('BSpline — endpoint interpolation trick', () => {
     const first = spline.getPointAt(0, new THREE.Vector3());
     expect(first.x).toBeCloseTo(0, 5);
     expect(first.y).toBeCloseTo(0, 5);
-    // Note: t=1 is intentionally NOT tested. The C# duplicate-endpoint trick
+    // Note: t=1 is intentionally NOT tested. The  duplicate-endpoint trick
     // makes t=0 land on the first input point, but t=1 is degenerate (reads
     // padded indices that mix the last input with its duplicates) and does NOT
     // return the last input point. The mesh builder respects this by stopping

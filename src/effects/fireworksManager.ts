@@ -148,6 +148,14 @@ export class FireworksManager {
     ctx.globalCompositeOperation = 'source-over';
   }
 
+  /** Drop all in-flight particles and wipe the canvas. Call on restart so
+   *  mid-burst particles from the previous run don't stay frozen on screen
+   *  through the pre-roll (when `update()` isn't being called). */
+  reset(): void {
+    this.particles.length = 0;
+    this.ctx.clearRect(0, 0, this.canvas.width / this.dpr, this.canvas.height / this.dpr);
+  }
+
   dispose(): void {
     window.removeEventListener('resize', this.resize);
     this.canvas.remove();

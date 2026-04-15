@@ -96,11 +96,13 @@ export class BlocksManager {
     this.aPickedAt = new THREE.InstancedBufferAttribute(pickedArray, 1);
     geo.setAttribute('aPickedAt', this.aPickedAt);
 
-    // Initial transforms — needed because update() ramps blocks in over the
-    // last 0.5 of song-percentage; before that they sit at their settled spot.
+    // Initial transforms must match what the first update(currentP=0) call
+    // would produce — otherwise every block visibly snaps backward by 0.075
+    // of track length at song start (slide-in ramp starts at endP-0.075,
+    // not endP). Previously this used writeMatrixForPercentage(e.endP)
+    // which set the SETTLED position, creating that jump.
     for (let i = 0; i < this.entries.length; i++) {
-      const e = this.entries[i]!;
-      this.writeMatrixForPercentage(i, e.endP);
+      this.writeMatrixForCurrentP(i, 0);
     }
     this.mesh.instanceMatrix.needsUpdate = true;
 
@@ -129,6 +131,16 @@ export class BlocksManager {
   /** Mark a block as picked at `time`. M7 will call this from collision. */
   pick(blockIndex: number, time: number): void {
     this.aPickedAt.setX(blockIndex, time);
+    this.aPickedAt.needsUpdate = true;
+  }
+
+  /** Reset every instance's `aPickedAt` to -1 so previously-picked blocks
+   *  render again. Call on song restart — otherwise blocks picked in the
+   *  previous run stay invisible (alpha=0) while the collision sweep still
+   *  walks over them and fires misses. */
+  resetAllPicks(): void {
+    const arr = this.aPickedAt.array as Float32Array;
+    arr.fill(-1);
     this.aPickedAt.needsUpdate = true;
   }
 
@@ -164,13 +176,6 @@ export class BlocksManager {
 
       this.entries.push({ endP, zOffset, lane: laneRaw });
     }
-  }
-
-  /** Settled position (block sitting at its endP target). */
-  private writeMatrixForPercentage(i: number, percentage: number): void {
-    const e = this.entries[i]!;
-    this.computeMatrix(percentage, e.zOffset);
-    this.mesh.setMatrixAt(i, this._matrix);
   }
 
   /**

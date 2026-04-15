@@ -8,3 +8,5 @@ dist
 package-lock.json
 # TypeScript incremental build cache.
 tsconfig.tsbuildinfo
+.env
+!.env.example

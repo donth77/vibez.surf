@@ -30,23 +30,23 @@ export function mountLoadingOverlay(): LoadingOverlay {
     }
     #loading-overlay.open { opacity: 1; }
     #loading-overlay .lo-card {
-      padding: 28px 40px;
-      min-width: 300px;
-      max-width: 460px;
+      padding: 30px 44px;
+      min-width: 320px;
+      max-width: 480px;
       text-align: center;
     }
     #loading-overlay .lo-spinner {
-      width: 28px; height: 28px;
-      margin: 0 auto 16px;
+      width: 32px; height: 32px;
+      margin: 0 auto 18px;
       border-radius: 50%;
       border: 2px solid rgba(255,255,255,0.15);
       border-top-color: #6cf;
       animation: lo-spin 900ms linear infinite;
     }
     #loading-overlay .lo-message {
-      font-size: 13px; letter-spacing: 0.08em;
+      font-size: 15px; letter-spacing: 0.08em;
       text-transform: uppercase; color: #8aa;
-      margin: 0 0 14px;
+      margin: 0 0 16px;
     }
     #loading-overlay .lo-bar {
       width: 100%; height: 3px;

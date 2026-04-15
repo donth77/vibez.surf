@@ -60,7 +60,7 @@ describe('Beat detection — guards', () => {
 });
 
 describe('Intensities', () => {
-  it('matches the C# averaging formula on a known signal', () => {
+  it('matches the averaging formula on a known signal', () => {
     // Constant DC signal of amplitude 0.5 → every chunk's avg-abs = 0.5
     const N = 4096;
     const samples = new Float32Array(N * 4).fill(0.5);

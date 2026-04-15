@@ -4,7 +4,7 @@
  *
  * Text format:
  *   SCORE: {current}/{total} ({percent}%)
- *   PICKED: {picked}/{picked + missed}
+ *   HIT: {picked}/{picked + missed}
  *   MISSED: {missed}    (red)
  */
 
@@ -125,7 +125,7 @@ export function mountEndSongPanel(): EndSongPanel {
         : '0.00';
       statsEl.innerHTML = `
         <div>SCORE: ${stats.currentPoints}/${stats.totalTrackPoints} (${pct}%)</div>
-        <div>PICKED: ${picked}/${picked + missed}</div>
+        <div>HIT: ${picked}/${picked + missed}</div>
         <div>MISSED: <span class="miss">${missed}</span></div>
       `;
       isOpen = true;

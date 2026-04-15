@@ -27,16 +27,26 @@ function getAudioContext(): AudioContext {
 
 export async function loadAudioFromFile(file: File): Promise<LoadedAudio> {
   const arrayBuffer = await file.arrayBuffer();
+  return loadAudioFromArrayBuffer(arrayBuffer, file.type || 'audio/mpeg');
+}
 
-  // decodeAudioData requires its own copy because we also pass the buffer to a Blob below.
-  // Some browsers detach the original after decode; safest to clone.
+/**
+ * Shared loader that takes already-fetched bytes. Used by `loadAudioFromFile`
+ * (local files) and `loadAudioFromUrl` (Suno / direct URLs / blob URLs).
+ */
+export async function loadAudioFromArrayBuffer(
+  arrayBuffer: ArrayBuffer,
+  mimeType: string = 'audio/mpeg',
+): Promise<LoadedAudio> {
+  // decodeAudioData can detach the original buffer on some browsers; work on a
+  // copy so the Blob below always has valid bytes.
   const decodeCopy = arrayBuffer.slice(0);
   const ctx = getAudioContext();
   const buffer = await ctx.decodeAudioData(decodeCopy);
 
   const samples = interleaveChannels(buffer);
 
-  const blobUrl = URL.createObjectURL(new Blob([arrayBuffer], { type: file.type || 'audio/mpeg' }));
+  const blobUrl = URL.createObjectURL(new Blob([arrayBuffer], { type: mimeType }));
   const element = new Audio();
   element.src = blobUrl;
   element.preload = 'auto';

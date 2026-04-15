@@ -1,18 +1,16 @@
 import * as THREE from 'three';
 
 /**
- * Block shader. Reference (real Audiosurf): blocks render as **solid bright
- * emissive cubes** — the soft glow halo comes entirely from the bloom pass,
- * not from anything in the block shader itself.
+ * Block shader. Solid bright emissive cube; bloom provides the glow halo.
  *
- * Authoritative values from `Assets/Materials/Block.mat`:
- *   _EmissionIntensity = 1.5     (multiplier on color)
- *   _Alpha             = 1       (driven from JS during pickup animation)
- *   _BaseColor         = (1,1,1) (overridden per-frame from current track color)
+ * Pickup animation (per-instance via `aPickedAt`):
+ *   - Block **shrinks** toward its local center (absorbed-into-the-ship feel)
+ *   - Brief **flash** of extra emissive in the first ~20% of the animation
+ *   - Alpha fades as the shrink progresses
  *
- * Per-instance pickup (wired in M7):
- *   `aPickedAt` = -1 means not picked; otherwise time in seconds when pickup
- *   was triggered. While picked: alpha fades out and the block rises along Y.
+ * Missed blocks keep `aPickedAt = -1` and render at full scale/opacity,
+ * passing by the ship unaffected — the visual difference between "picked"
+ * and "missed" is now unambiguous.
  */
 
 const VERT = /* glsl */ `
@@ -21,14 +19,21 @@ varying float vPickT;
 
 uniform float uTime;
 uniform float uPickDuration;
-uniform float uPickRiseSpeed;
 
 void main() {
   vPickT = aPickedAt < 0.0 ? -1.0 : clamp((uTime - aPickedAt) / uPickDuration, 0.0, 1.0);
 
   vec3 p = position;
   if (vPickT >= 0.0) {
-    p.y += vPickT * uPickRiseSpeed * uPickDuration;
+    // Shrink toward the block's geometric center (geometry was translated
+    // +0.175 on Y at construction so (0, 0.175, 0) is the cube center).
+    // Ease-in cubic so the first frames of shrink are slow, then snap down —
+    // reads as "zap!" rather than a gentle fade.
+    float shrink = 1.0 - pow(vPickT, 0.6);
+    vec3 center = vec3(0.0, 0.175, 0.0);
+    p = center + (p - center) * shrink;
+    // Small upward drift so the residual flash doesn't sit on the track.
+    p.y += vPickT * 0.25;
   }
   gl_Position = projectionMatrix * modelViewMatrix * instanceMatrix * vec4(p, 1.0);
 }
@@ -44,9 +49,18 @@ uniform float uHdrBoost;
 varying float vPickT;
 
 void main() {
+  // Flash: strong extra emission during the first 20% of the pickup so the
+  // block briefly lights up before collapsing. Peak at vPickT ≈ 0.1.
+  float flash = vPickT < 0.0 ? 0.0 : smoothstep(0.0, 0.15, vPickT) * (1.0 - smoothstep(0.15, 0.45, vPickT));
+
   vec3 col = uColor * uEmissionIntensity * uHdrBoost;
-  float alpha = vPickT < 0.0 ? 1.0 : (1.0 - vPickT);
+  col += uColor * flash * 3.0;     // HDR flash, catches bloom heavily
+  col = mix(col, vec3(1.0) * uHdrBoost * 2.0, flash * 0.6); // white-hot briefly
+
+  // Alpha stays full for most of the shrink, then fades in the last 30%.
+  float alpha = vPickT < 0.0 ? 1.0 : (1.0 - smoothstep(0.7, 1.0, vPickT));
   if (alpha <= 0.001) discard;
+
   gl_FragColor = vec4(col, alpha);
 }
 `;
@@ -68,8 +82,9 @@ export function createBlockMaterial(): BlockMaterial {
       uColor: { value: new THREE.Color(1, 1, 1) },
       uEmissionIntensity: { value: 1.5 }, // from `Assets/Materials/Block.mat`
       uHdrBoost: { value: 1.2 },          // light HDR push — blocks read colored, not blinding
-      uPickDuration: { value: 0.6 },
-      uPickRiseSpeed: { value: 8.0 },
+      // Shorter duration than the previous 0.6s — feels more like a zap and
+      // less like a gentle fade.
+      uPickDuration: { value: 0.25 },
     },
   }) as BlockMaterial;
 

@@ -1,10 +1,10 @@
-# CLAUDE.md — notes for AI agents working in this repo
+# CLAUDE.md
 
 This file is the fast-path briefing. Read it before you read the code.
 
 ## What the project is
 
-Vibez.surf is a browser-based music visualizer / rhythm game, inspired by
+vibez.surf is a browser-based music visualizer / rhythm game, inspired by
 Audiosurf. A user picks an audio file; we analyze it, generate a 3D track
 from the intensity signal, and they ride the track locked to audio playback
 time while collecting blocks placed on detected beats.
@@ -27,6 +27,46 @@ pnpm build        # tsc -b && vite build
 
 Prefer `pnpm typecheck` over starting the dev server when you just want to
 validate changes.
+
+## How it works (pipeline)
+
+From "user drops a file" to "player riding the track":
+
+1. **Load** (`src/audio/audioLoader.ts`) — `AudioContext.decodeAudioData`
+   on the file bytes. Interleave channels into a single `Float32Array`
+   (`[L0,R0,L1,R1,…]`). Never averaged to mono — see the audio-sample-layout
+   convention below.
+2. **Analyze** (`src/audio/audioAnalysis.ts` + `fft.worker.ts`) — a worker
+   pool runs FFT across the interleaved stream in 4096-sample chunks. The
+   spectra + intensities feed:
+   - per-chunk intensity → track speed, color hue, rocket-fire size
+   - low-band (~20 Hz) + high-band (~7500 Hz) beat indexes → block placement
+     and hexagon-pillar pulses
+3. **Generate track** (`src/track/trackGenerator.ts` + `util/bSpline.ts`) —
+   a cubic uniform B-spline polyline is built from the intensity signal.
+   Smoothed slope values drive vertical bumps; a second, more heavily
+   smoothed signal drives horizontal sweeps. Vertex colors derive from the
+   slope via HSV. The ribbon mesh is built in `src/track/buildSplineMesh.ts`.
+4. **Place blocks + hexagons** (`src/blocks/blocksManager.ts`,
+   `src/effects/hexagonsManager.ts`) — beats → lanes via a deterministic
+   noise rule; hexagon columns spaced adaptively by intensity. Both use the
+   spline's tangent + bitangent for positioning so they track curves.
+5. **Play** (`src/player/playerController.ts` + `src/main.ts` tick) — the
+   player's percentage along the track is `audio.currentTime / duration`.
+   Lateral offset accumulates from keyboard/touch input along the spline's
+   bitangent. A swept-sphere collision sweep
+   (`src/blocks/collisionSweep.ts`) decides block picks vs misses — it
+   tracks the minimum lateral distance over a small percentage window
+   around each block's `endP` so brief drive-bys still register.
+6. **Feedback loop** — picks fire the block's `aPickedAt` instanced
+   attribute (shader shrinks + flashes the cube), update `PointsManager`
+   (exact curve: `inc = min(200, inc+4)` per pick; `score -= 200`,
+   `inc = max(1, inc-50)` per miss), and trigger 2D screen-space fireworks
+   in the matching lane corner (`src/effects/fireworksManager.ts`).
+
+The shader files (`trackMaterial.ts`, `blockMaterial.ts`,
+`hexagonMaterial.ts`, `rocketFire.ts`) are custom `ShaderMaterial`s with
+inline GLSL. Only postprocessing is a single `UnrealBloomPass`.
 
 ## Directory map
 
@@ -106,10 +146,3 @@ public/assets/ OBJ + textures
 2. If it announces state (score, progress, status), wire a live region.
 3. If it animates, check `prefers-reduced-motion`.
 4. Run `pnpm typecheck` before claiming done.
-
-## Milestones (M1–M11)
-
-Code comments reference milestones like `M6`, `M7`, `M10`, `M11`. These are
-development phases tracked in the user's own notes — not a shipping
-contract. `M11` is a "final polish" catch-all; don't treat those TODOs as
-urgent unless the user mentions them.
