@@ -91,6 +91,7 @@ composer.addPass(bloom);
 
 let trackMesh: THREE.Mesh | null = null;
 let runwayMesh: THREE.Mesh | null = null;
+let postRunwayMesh: THREE.Mesh | null = null;
 let trackMaterial: TrackMaterial | null = null;
 let player: PlayerController | null = null;
 let detachInput: (() => void) | null = null;
@@ -223,6 +224,12 @@ let currentAudio: LoadedAudio | null = null;
 /** Per-song pre-roll distance, recomputed in startGame to match the song's
  *  average forward speed. Used by both the runway mesh and `startPreRoll`. */
 let preRollDistance = 0;
+/** Per-song post-roll distance, computed from the song's ending forward
+ *  speed. Used by both the forward runway mesh and `startPostRoll`. */
+let postRollDistance = 0;
+/** Seconds the ship cruises past the endpoint before the end-song panel
+ *  pops. Same shape as the pre-roll — matching book-ends feel right. */
+const POSTROLL_SECONDS = 3;
 let fileBrowser: FileBrowser | null = null;
 let sunoSettingsModal: SunoSettingsModal | null = null;
 
@@ -251,7 +258,7 @@ async function startGame(loaded: LoadedAudio, title: string, source: CurrentSour
   console.log('[audio] loaded', summary);
   hud.setSummary(title, buffer);
 
-  element.addEventListener('ended', () => {
+  element.addEventListener('ended', async () => {
       console.log('[audio] ended event fired');
       hud.setStatus('Playback ended.');
       if (!songRecorded) {
@@ -272,6 +279,10 @@ async function startGame(loaded: LoadedAudio, title: string, source: CurrentSour
         recordSong(entry);
         fileBrowser?.refreshRecents();
       }
+      // Post-roll cruise — ship coasts past the endpoint onto the
+      // forward runway so the track feels like it extends into the
+      // distance. Score panel pops once the cruise finishes.
+      if (player) await player.startPostRoll(POSTROLL_SECONDS, postRollDistance);
       showEndSongPanel();
     });
     element.addEventListener('timeupdate', () => {
@@ -308,6 +319,11 @@ async function startGame(loaded: LoadedAudio, title: string, source: CurrentSour
       runwayMesh.geometry.dispose();
       runwayMesh = null;
     }
+    if (postRunwayMesh) {
+      scene.remove(postRunwayMesh);
+      postRunwayMesh.geometry.dispose();
+      postRunwayMesh = null;
+    }
     if (trackMaterial) trackMaterial.dispose();
     trackMaterial = createTrackMaterial({ durationSec: buffer.duration });
     trackMesh = new THREE.Mesh(trackData.mesh, trackMaterial);
@@ -336,6 +352,34 @@ async function startGame(loaded: LoadedAudio, title: string, source: CurrentSour
       new THREE.Vector3(0, 0, 1),
     );
     runwayMesh = new THREE.Mesh(runwayGeom, trackMaterial);
+
+    // Post-roll runway — mirror of the pre-roll ramp, attached to the
+    // spline's endpoint. Ship cruises past the song's end onto this
+    // forward extension while we wait to pop the end-song panel, so the
+    // track reads as "extending into the distance" instead of abruptly
+    // cutting off the moment audio stops.
+    const _probeEndA = new THREE.Vector3();
+    const _probeEndB = new THREE.Vector3();
+    // Probe near the real track-mesh end (`1023/1024` with the default
+    // resolution) with A BEFORE B so dt is positive. Matches the join
+    // point `PlayerController.startPostRoll` uses, so the ship launches
+    // off the runway at exactly the mesh's last speed.
+    const endJoinT = 1023 / 1024;
+    const endSampleA = Math.max(0, endJoinT - DP);
+    const endSampleB = endJoinT;
+    trackData.spline.getPointAt(endSampleA, _probeEndA);
+    trackData.spline.getPointAt(endSampleB, _probeEndB);
+    const endSpeed = _probeEndA.distanceTo(_probeEndB) / ((endSampleB - endSampleA) * buffer.duration);
+    postRollDistance = endSpeed * POSTROLL_SECONDS;
+    const postRunwayGeom = buildRunwayMesh(
+      trackData.spline,
+      postRollDistance + RUNWAY_PADDING,
+      5,
+      new THREE.Vector3(0, 0, 1),
+      /* atEnd */ true,
+    );
+    postRunwayMesh = new THREE.Mesh(postRunwayGeom, trackMaterial);
+
     // NOTE: not adding trackMesh to the scene yet. Adding it here (before the
     // player reparents the camera) would produce a one-frame flash rendering
     // the full track from the default OrbitControls position at (0, 60, 80).
@@ -363,6 +407,7 @@ async function startGame(loaded: LoadedAudio, title: string, source: CurrentSour
     // Player + camera are ready — safe to show the track now.
     scene.add(trackMesh);
     if (runwayMesh) scene.add(runwayMesh);
+    if (postRunwayMesh) scene.add(postRunwayMesh);
 
     // M6 — blocks (visual only; collision/scoring below).
     if (blocks) scene.remove((blocks as unknown as { mesh: THREE.Object3D }).mesh);
@@ -722,7 +767,7 @@ function tick() {
   }
   if (trackMaterial) trackMaterial.setTime(t);
 
-  if (blocks && currentAudio && player && !paused && !player.isPreRolling) {
+  if (blocks && currentAudio && player && !paused && !player.isPreRolling && !player.isPostRolling) {
     const dur = currentAudio.element.duration;
     if (isFinite(dur) && dur > 0) {
       const currentP = Math.min(0.9999, Math.max(0, currentAudio.element.currentTime / dur));

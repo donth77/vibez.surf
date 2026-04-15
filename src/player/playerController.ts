@@ -107,6 +107,18 @@ export class PlayerController {
    *  same way it does during normal play. */
   private readonly _preRollBitangent = new THREE.Vector3();
 
+  // Post-roll state — ship cruises past the spline endpoint into the
+  // forward-extension runway after audio ends. Lets the track "extend
+  // into the distance" for a beat before the end-song panel pops up.
+  private postRollActive = false;
+  private postRollElapsed = 0;
+  private postRollSeconds = 0;
+  private postRollDistance = 0;
+  private postRollResolve: (() => void) | null = null;
+  private readonly _postRollOrigin = new THREE.Vector3();
+  private readonly _postRollTangent = new THREE.Vector3();
+  private readonly _postRollBitangent = new THREE.Vector3();
+
   // Scratch.
   private readonly _point = new THREE.Vector3();
   private readonly _tangent = new THREE.Vector3();
@@ -401,15 +413,124 @@ export class PlayerController {
     return this.preRollActive;
   }
 
+  /**
+   * Start a post-roll cruise. Mirrors `startPreRoll` but forward — ship
+   * leaves the spline endpoint and keeps travelling along the forward
+   * runway extension for `seconds`. Callers await the returned promise
+   * before popping the end-song panel so the track reads as extending
+   * into the distance before the modal takes over.
+   */
+  startPostRoll(seconds: number, distance: number): Promise<void> {
+    this.postRollResolve?.();
+    this.postRollActive = true;
+    this.postRollElapsed = 0;
+    this.postRollSeconds = seconds;
+    this.postRollDistance = distance;
+    // Origin = the raw spline point at the join-T, NOT root.position.
+    // root.position already has `bitangent × inputScalar` baked in from
+    // normal update; if we captured that here and also re-applied it
+    // per frame in updatePostRoll, the ship would jump sideways by the
+    // lateral offset. Since normal update has position tracking to
+    // 1023/1024, the spline point at the join-T matches the ship's
+    // spline-centerline position at the instant audio ends → no snap.
+    const joinT = 1023 / 1024;
+    this.trackData.spline.getPointAt(joinT, this._postRollOrigin);
+    this.trackData.spline.getTangentAt(joinT, this._postRollTangent);
+    if (this._postRollTangent.lengthSq() < 1e-8) this._postRollTangent.set(1, 0, 0);
+    this._postRollTangent.normalize();
+    this.trackData.spline.getBitangentPerpendicularToTangent(
+      joinT, this._bitangentDesired, this._postRollBitangent,
+    );
+    this.mouseDeltaX = 0;
+    this.frameSwipeDelta = 0;
+    return new Promise<void>((resolve) => {
+      this.postRollResolve = resolve;
+    });
+  }
+
+  /** True while the ship is gliding past the spline endpoint, before the score panel pops. */
+  get isPostRolling(): boolean {
+    return this.postRollActive;
+  }
+
+  private updatePostRoll(dt: number): void {
+    this.postRollElapsed += dt;
+    const t = Math.min(1, this.postRollElapsed / this.postRollSeconds);
+    // CONSTANT-velocity cruise. Distance sized so velocity matches the
+    // song's end velocity for a seamless handoff.
+    const forwardOffset = this.postRollDistance * t;
+
+    // Keep steering responsive so the player can still swerve if they
+    // feel like it — same input math as normal play.
+    const keyInput = -this.keyAxis * KEYBOARD_LATERAL_PER_SEC * dt;
+    const swipeInput = this.mouseDeltaX * PIXELS_TO_INPUT_AXIS;
+    this.frameSwipeDelta = this.mouseDeltaX;
+    this.mouseDeltaX = 0;
+    this.inputScalar += keyInput + swipeInput;
+    if (this.inputScalar > this.maxInputOffset) this.inputScalar = this.maxInputOffset;
+    else if (this.inputScalar < -this.maxInputOffset) this.inputScalar = -this.maxInputOffset;
+
+    this.root.position.copy(this._postRollOrigin)
+      .addScaledVector(this._postRollTangent, forwardOffset)
+      .addScaledVector(this._postRollBitangent, this.inputScalar);
+
+    this.applyForward(this._postRollTangent);
+    this.updateSpaceshipAnimation(dt);
+
+    // Color / emissive / rocket fire from the song's last chunk (sampled
+    // at the same joinT the runway mesh uses) — keeps the mood
+    // continuous with whatever the track was just doing at its end.
+    this.trackData.spline.getColorAt(1023 / 1024, this._color);
+    for (const mat of this.syncedEmissiveMaterials) {
+      mat.emissive.copy(this._color);
+    }
+    const intensities = this.trackData.normalizedIntensities;
+    const lastIntensity = intensities[intensities.length - 1] ?? 0.5;
+    for (const rf of this.rocketFires) {
+      rf.update(performance.now() / 1000, lastIntensity, this._color, ROCKET_MIN_SPEED, ROCKET_MAX_SPEED);
+    }
+
+    this._color.getHSL(this._hsl);
+    const currentSpeed = clamp01((0.83 - this._hsl.h) / 0.83);
+    this.camera.position.lerpVectors(this.cameraFar, this.cameraNear, currentSpeed);
+    _scratchVec.set(
+      this.camera.position.x,
+      this.camera.position.y - 20 * Math.sin(CAMERA_PITCH_RAD),
+      this.camera.position.z + 20 * Math.cos(CAMERA_PITCH_RAD),
+    );
+    this.cameraRig.localToWorld(_scratchVec);
+    this.camera.lookAt(_scratchVec);
+
+    if (t >= 1) {
+      this.postRollActive = false;
+      const resolve = this.postRollResolve;
+      this.postRollResolve = null;
+      resolve?.();
+    }
+  }
+
   /** Call once per frame. Dt in seconds. */
   update(dt: number): void {
     if (this.preRollActive) {
       this.updatePreRoll(dt);
       return;
     }
+    if (this.postRollActive) {
+      this.updatePostRoll(dt);
+      return;
+    }
     const duration = this.audio.duration;
     if (!isFinite(duration) || duration <= 0) return;
-    const currentP = Math.min(0.9999, Math.max(0, this.audio.currentTime / duration));
+    // Position can track audio all the way to the drawable end of the
+    // ribbon (1023/1024 with default resolution). The earlier 0.995
+    // clamp fixed camera shake but also froze the ship for the last
+    // ~0.5s of audio, which read as hitting an invisible wall. Only the
+    // TANGENT goes erratic near the endpoint (duplicated control points
+    // → direction oscillates frame-to-frame), so we clamp that alone:
+    // position follows audio, rotation samples a safe T.
+    const rawP = Math.max(0, this.audio.currentTime / duration);
+    const currentP = Math.min(1023 / 1024, rawP);
+    const tangentP = Math.min(0.995, rawP);
 
     const spline = this.trackData.spline;
 
@@ -429,19 +550,19 @@ export class PlayerController {
     this.frameSwipeDelta = this.mouseDeltaX;
     this.mouseDeltaX = 0;
 
-    spline.getBitangentPerpendicularToTangent(currentP, this._bitangentDesired, this._bitangent);
+    // Bitangent is derived from tangent → use the stable `tangentP` so
+    // lateral offset doesn't flip direction near the endpoint.
+    spline.getBitangentPerpendicularToTangent(tangentP, this._bitangentDesired, this._bitangent);
     this.inputScalar += inputX;
     if (this.inputScalar > this.maxInputOffset) this.inputScalar = this.maxInputOffset;
     else if (this.inputScalar < -this.maxInputOffset) this.inputScalar = -this.maxInputOffset;
 
-    // Position: slide along the spline's bitangent by the signed offset. With
-    // the track now curving horizontally, this keeps the player exactly on the
-    // track's cross-section (same math blocks/hexagons use).
+    // Position follows audio all the way to the drawable end.
     spline.getPointAt(currentP, this._point);
     this.root.position.copy(this._point).addScaledVector(this._bitangent, this.inputScalar);
 
-    // Orientation: smooth rotate forward toward spline tangent.
-    spline.getTangentAt(currentP, this._tangent);
+    // Rotation uses the clamped `tangentP` to avoid endpoint-duplication jitter.
+    spline.getTangentAt(tangentP, this._tangent);
     if (this._tangent.lengthSq() > 1e-8) {
       this._targetForward.copy(this._tangent).normalize();
       this._currentForward.lerp(this._targetForward, Math.min(1, this.rotationSmoothness * dt));
