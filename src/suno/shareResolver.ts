@@ -66,5 +66,22 @@ export async function resolveSunoShareLink(shareUrl: string): Promise<ResolvedSh
     );
   }
 
-  return { audioUrl: parsed.toString(), title: body.title ?? null };
+  return { audioUrl: parsed.toString(), title: body.title ? decodeHtmlEntities(body.title) : null };
+}
+
+/**
+ * Decode HTML entities in a scraped title. The worker pulls titles from
+ * Suno's `og:title` meta tag, where attribute values are HTML-encoded — so
+ * "Rock & Roll" arrives as "Rock &amp; Roll" and the HUD, which uses
+ * `textContent`, would render the entity literally.
+ */
+function decodeHtmlEntities(s: string): string {
+  return s
+    .replace(/&#x([0-9a-f]+);/gi, (_, n) => String.fromCodePoint(parseInt(n, 16)))
+    .replace(/&#(\d+);/g, (_, n) => String.fromCodePoint(Number(n)))
+    .replace(/&quot;/g, '"')
+    .replace(/&apos;/g, "'")
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&amp;/g, '&');
 }
