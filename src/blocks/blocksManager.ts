@@ -135,13 +135,23 @@ export class BlocksManager {
   }
 
   /** Reset every instance's `aPickedAt` to -1 so previously-picked blocks
-   *  render again. Call on song restart — otherwise blocks picked in the
-   *  previous run stay invisible (alpha=0) while the collision sweep still
-   *  walks over them and fires misses. */
+   *  render again, AND rewrite every instance matrix to the currentP=0
+   *  slide-in state. Call on song restart.
+   *
+   *  Why matrix reset: block updates are gated off during the pre-roll
+   *  cruise, so without this the instances keep their end-of-song
+   *  matrices (blockP=1, posP=endP). When the pre-roll ends and
+   *  `update(currentP≈0)` fires, every block snaps backward by up to
+   *  0.075 of track length to its slide-in start — reads as blocks
+   *  "jumping forward" (toward the camera) the instant audio begins. */
   resetAllPicks(): void {
     const arr = this.aPickedAt.array as Float32Array;
     arr.fill(-1);
     this.aPickedAt.needsUpdate = true;
+    for (let i = 0; i < this.entries.length; i++) {
+      this.writeMatrixForCurrentP(i, 0);
+    }
+    this.mesh.instanceMatrix.needsUpdate = true;
   }
 
   /** Test only — direct access to the entries for parity tests. */
