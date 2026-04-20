@@ -18,7 +18,7 @@
   "devDependencies": {
     "@types/stats.js": "^0.17.3",
     "@types/three": "^0.160.0",
-    "typescript": "^5.4.0",
+    "typescript": "^6.0.3",
     "vite": "^6.4.2",
     "vitest": "^1.6.0"
   },
