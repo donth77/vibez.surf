@@ -1,5 +1,7 @@
 # [vibez.surf](https://vibez.surf)
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/donth77/vibez.surf/blob/main/LICENSE) [![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/) [![Three.js](https://img.shields.io/badge/Three.js-000?logo=threedotjs&logoColor=white)](https://threejs.org/) [![Vite](https://img.shields.io/badge/Vite-646CFF?logo=vite&logoColor=white)](https://vite.dev/) [![Play Now](https://img.shields.io/badge/Play_Now-vibez.surf-ff69b4)](https://vibez.surf)
+
 A browser-based music visualizer and rhythm game. Pick any song; the game
 analyzes it and generates a 3D track you ride to the beat, picking up blocks
 placed on moments of musical energy.
